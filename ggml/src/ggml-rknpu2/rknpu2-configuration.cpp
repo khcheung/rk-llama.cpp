@@ -133,6 +133,7 @@ Rknpu2ConfigManager::Rknpu2ConfigManager() {
     Rknpu2DeviceConfig rk3588_config;
     rk3588_config.device_name = "RK3588";
     rk3588_config.active_cores = custom_cores.empty() ? std::vector<int>{0, 1, 2} : custom_cores;
+    rk3588_config.core_mask = true;
     rk3588_config.max_k_limit = 8192;
     rk3588_config.hardware_pipelines = {
         {
@@ -221,9 +222,69 @@ Rknpu2ConfigManager::Rknpu2ConfigManager() {
     // device_configs["RK3576"] = rk3576_config;
 
     // --- Define RK3566 Configuration (Placeholder) ---
-    // Rknpu2DeviceConfig rk3566_config;
-    // ... fill config for RK3566 ...
-    // device_configs["RK3566"] = rk3566_config;
+    Rknpu2DeviceConfig rk3566_config;
+    rk3566_config.device_name = "RK3566";
+    rk3566_config.active_cores = custom_cores.empty() ? std::vector<int>{0} : custom_cores;
+    rk3566_config.core_mask = false;
+    rk3566_config.max_k_limit = 1024;
+    rk3566_config.hardware_pipelines = {
+        {
+            /* .pipeline_name = */ "W16A16_STANDARD",
+            /* .npu_type_a    = */ NPU_TYPE_FP16,
+            /* .npu_type_b    = */ NPU_TYPE_FP16,
+            /* .npu_type_c    = */ NPU_TYPE_FP32,
+            /* .mm_type       = */ RKNN_FLOAT16_MM_FLOAT16_TO_FLOAT32,
+            /* .k_align       = */ 16,
+            /* .n_align       = */ 8,
+            /* .effective_k   = */ 0,
+            /* .use_hadamard  = */ false
+        },
+        {
+            /* .pipeline_name = */ "W16A16_HADAMARD",
+            /* .npu_type_a    = */ NPU_TYPE_FP16,
+            /* .npu_type_b    = */ NPU_TYPE_FP16,
+            /* .npu_type_c    = */ NPU_TYPE_FP32,
+            /* .mm_type       = */ RKNN_FLOAT16_MM_FLOAT16_TO_FLOAT32,
+            /* .k_align       = */ 16,
+            /* .n_align       = */ 8,
+            /* .effective_k   = */ 0,
+            /* .use_hadamard  = */ true
+        },
+        {
+            /* .pipeline_name = */ "W8A8_STANDARD",
+            /* .npu_type_a    = */ NPU_TYPE_INT8,
+            /* .npu_type_b    = */ NPU_TYPE_INT8,
+            /* .npu_type_c    = */ NPU_TYPE_INT32,
+            /* .mm_type       = */ RKNN_INT8_MM_INT8_TO_INT32,
+            /* .k_align       = */ 32,
+            /* .n_align       = */ 16,
+            /* .effective_k   = */ 0,
+            /* .use_hadamard  = */ false
+        },
+        {
+            /* .pipeline_name = */ "W8A8_HADAMARD",
+            /* .npu_type_a    = */ NPU_TYPE_INT8,
+            /* .npu_type_b    = */ NPU_TYPE_INT8,
+            /* .npu_type_c    = */ NPU_TYPE_INT32,
+            /* .mm_type       = */ RKNN_INT8_MM_INT8_TO_INT32,
+            /* .k_align       = */ 32,
+            /* .n_align       = */ 16,
+            /* .effective_k   = */ 0,
+            /* .use_hadamard  = */ true
+        }   
+    };
+
+    // Assigning custom variables
+    rk3566_config.use_custom_pattern = use_custom_pattern;
+    rk3566_config.custom_hybrid_pattern = custom_pattern;
+
+    // Defining default quantization sequences for each supported ggml_type
+    rk3566_config.default_patterns[(int)GGML_TYPE_F16]  = {"W16A16_STANDARD"};
+    rk3566_config.default_patterns[(int)GGML_TYPE_Q8_0] = {"W8A8_STANDARD"};
+    rk3566_config.default_patterns[(int)GGML_TYPE_Q6_K] = {"W8A8_STANDARD"};
+    rk3566_config.default_patterns[(int)GGML_TYPE_Q4_0] = {"W8A8_STANDARD"};
+
+    device_configs["RK3566"] = rk3566_config;        
 
     // Select a default device
     if (!device_configs.empty()) {

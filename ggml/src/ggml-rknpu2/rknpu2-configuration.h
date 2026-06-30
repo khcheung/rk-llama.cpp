@@ -84,6 +84,7 @@ struct Rknpu2HardwarePipeline {
 struct Rknpu2DeviceConfig {
     std::string device_name;
     std::vector<int> active_cores;
+    bool core_mask = true; // RK3566/RK3568 Cannot call Set Core Mask
     int max_k_limit = 0;
     std::vector<Rknpu2HardwarePipeline> hardware_pipelines;
 

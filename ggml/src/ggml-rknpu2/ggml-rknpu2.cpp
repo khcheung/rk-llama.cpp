@@ -365,7 +365,7 @@ struct ggml_backend_rknpu_context {
     // C-matrices cache (M, N, core_id, npu_type_c, domain_id)
     std::unordered_map<std::tuple<int, int, int, int, int>, std::shared_ptr<rknn_tensor_mem>, TupleHasher> c_buffer_cache;
 
-    std::shared_ptr<rknpu_matmul_context> get_matmul_ctx(uintptr_t tensor_id, size_t offset, int M, int K, int N, int core_id, rknn_matmul_type type, int32_t domain_id) {
+    std::shared_ptr<rknpu_matmul_context> get_matmul_ctx(uintptr_t tensor_id, size_t offset, int M, int K, int N, int core_id, rknn_matmul_type type, int32_t domain_id, bool core_mask) {
         std::lock_guard<std::mutex> lock(mutex);
 
         auto key = std::make_tuple(tensor_id, offset, M, K, N, core_id, (int)type, (int)domain_id);
@@ -378,18 +378,20 @@ struct ggml_backend_rknpu_context {
         if (ctx->ctx == 0) {
             return nullptr;
         }
+        
+        if (core_mask) {
+            rknn_core_mask core_mask;
+            switch(core_id) {
+                case 0: core_mask = RKNN_NPU_CORE_0; break;
+                case 1: core_mask = RKNN_NPU_CORE_1; break;
+                case 2: core_mask = RKNN_NPU_CORE_2; break;
+                default: core_mask = RKNN_NPU_CORE_AUTO; break;
+            }
 
-        rknn_core_mask core_mask;
-        switch(core_id) {
-            case 0: core_mask = RKNN_NPU_CORE_0; break;
-            case 1: core_mask = RKNN_NPU_CORE_1; break;
-            case 2: core_mask = RKNN_NPU_CORE_2; break;
-            default: core_mask = RKNN_NPU_CORE_AUTO; break;
-        }
-
-        int ret = rknn_matmul_set_core_mask(ctx->ctx, core_mask);
-        if (ret != RKNN_SUCC) {
-            // Handle error
+            int ret = rknn_matmul_set_core_mask(ctx->ctx, core_mask);
+            if (ret != RKNN_SUCC) {
+                // Handle error
+            }
         }
 
         matmul_ctx_cache[key] = ctx;
@@ -587,7 +589,7 @@ static enum ggml_status ggml_backend_rknpu_graph_compute(ggml_backend_t backend,
                         // Getting matmul context from cache
                         matmul_ctxs[idx] = backend_ctx->get_matmul_ctx(
                             (uintptr_t)tensor_virt_addr, offset_in_dma, M_op, K_seg_op, n_seg.size_n,
-                            n_seg.core_id, matmul_type, b_domain_id
+                            n_seg.core_id, matmul_type, b_domain_id, config.core_mask
                         );
                         if (!matmul_ctxs[idx] || matmul_ctxs[idx]->ctx == 0) return GGML_STATUS_FAILED;
 
@@ -1209,6 +1211,8 @@ static ggml_backend_buffer_t ggml_backend_rknpu_buffer_type_alloc_buffer(ggml_ba
         /* .memset_tensor = */ NULL,
         /* .set_tensor    = */ ggml_backend_rknpu_buffer_set_tensor,
         /* .get_tensor    = */ ggml_backend_rknpu_buffer_get_tensor,
+        /* .set_tensor_2d   = */ NULL,
+        /* .get_tensor_2d   = */ NULL,                
         /* .cpy_tensor    = */ NULL,
         /* .clear         = */ ggml_backend_rknpu_buffer_clear,
         /* .reset         = */ NULL,
@@ -1340,6 +1344,8 @@ static ggml_backend_t ggml_backend_rknpu_device_init_backend(ggml_backend_dev_t 
         /* .free               = */ ggml_backend_rknpu_free,
         /* .set_tensor_async   = */ NULL,
         /* .get_tensor_async   = */ NULL,
+        /* .set_tensor_2d_async= */ NULL,
+        /* .get_tensor_2d_async= */ NULL,           
         /* .cpy_tensor_async   = */ NULL,
         /* .synchronize        = */ NULL,
         /* .graph_plan_create  = */ NULL,
